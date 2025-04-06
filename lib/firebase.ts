@@ -15,7 +15,7 @@ const requiredEnvVars = [
 const missingEnvVars = requiredEnvVars.filter((varName) => !process.env[varName])
 
 if (missingEnvVars.length > 0) {
-  console.error(`Missing required environment variables: ${missingEnvVars.join(", ")}`)
+  console.log(`Missing required environment variables: ${missingEnvVars.join(", ")}`)
 }
 
 const firebaseConfig = {

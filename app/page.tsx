@@ -6,6 +6,7 @@ import Dashboard from "@/components/dashboard/dashboard"
 import LoadingSpinner from "@/components/ui/loading-spinner"
 
 export default function Home() {
+  
   const { user, loading } = useAuth()
 
   return (
@@ -14,4 +15,5 @@ export default function Home() {
     </main>
   )
 }
+
 

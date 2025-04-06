@@ -3,7 +3,6 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
-import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
@@ -11,8 +10,10 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Money Manager",
   description: "Track your lending and borrowing transactions",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
+
+
 
 export default function RootLayout({
   children,
@@ -22,12 +23,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
             {children}
             <Toaster />
           </AuthProvider>
-        </ThemeProvider>
+        <script>
+          
+        </script>
       </body>
     </html>
   )
