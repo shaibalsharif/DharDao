@@ -60,9 +60,6 @@
     "zod": "latest",
     "firebase": "latest"
   },
-  "engines": {
-  "node": "18.x"
-},
   "devDependencies": {
     "@types/node": "^22",
     "@types/react": "^19",

@@ -1,10 +1,3 @@
-let userConfig = undefined
-try {
-  userConfig = await import('./v0-user-next.config')
-} catch (e) {
-  // ignore error
-}
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
@@ -23,7 +16,13 @@ const nextConfig = {
   },
 }
 
-mergeConfig(nextConfig, userConfig)
+// Use a regular try-catch with require instead of import
+try {
+  const userConfig = require('./v0-user-next.config')
+  mergeConfig(nextConfig, userConfig)
+} catch (e) {
+  // ignore error
+}
 
 function mergeConfig(nextConfig, userConfig) {
   if (!userConfig) {
@@ -45,4 +44,4 @@ function mergeConfig(nextConfig, userConfig) {
   }
 }
 
-export default nextConfig
+module.exports = nextConfig
