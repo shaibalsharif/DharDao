@@ -78,6 +78,7 @@ export default function Dashboard({ userId }: { userId: string }) {
     setIsBorrowingFormOpen(false)
     setIsRecoveryFormOpen(false)
     setIsPaymentFormOpen(false)
+    setSelectedTransaction(null)
   }
 
   const handleContactUpdated = (updatedContacts: Contact[]) => {
@@ -151,25 +152,37 @@ export default function Dashboard({ userId }: { userId: string }) {
             <div className="container mx-auto px-4">
               <div className="grid grid-cols-2 gap-2">
                 <Button
-                  onClick={() => setIsLendingFormOpen(true)}
+                  onClick={() => {
+                    setSelectedTransaction(null)
+                    setIsLendingFormOpen(true)
+                  }}
                   className="bg-green-600 hover:bg-green-700 h-10 text-sm"
                 >
                   <PlusCircle className="mr-1 h-4 w-4" /> Add Lending
                 </Button>
                 <Button
-                  onClick={() => setIsBorrowingFormOpen(true)}
+                  onClick={() => {
+                    setSelectedTransaction(null)
+                    setIsBorrowingFormOpen(true)
+                  }}
                   className="bg-red-600 hover:bg-red-700 h-10 text-sm"
                 >
                   <PlusCircle className="mr-1 h-4 w-4" /> Add Borrowing
                 </Button>
                 <Button
-                  onClick={() => setIsRecoveryFormOpen(true)}
+                  onClick={() => {
+                    setSelectedTransaction(null)
+                    setIsRecoveryFormOpen(true)
+                  }}
                   className="bg-blue-600 hover:bg-blue-700 h-10 text-sm"
                 >
                   <RefreshCw className="mr-1 h-4 w-4" /> Record Recovery
                 </Button>
                 <Button
-                  onClick={() => setIsPaymentFormOpen(true)}
+                  onClick={() => {
+                    setSelectedTransaction(null)
+                    setIsPaymentFormOpen(true)
+                  }}
                   className="bg-purple-600 hover:bg-purple-700 h-10 text-sm"
                 >
                   <DollarSign className="mr-1 h-4 w-4" /> Record Payment
@@ -209,7 +222,10 @@ export default function Dashboard({ userId }: { userId: string }) {
 
       {isLendingFormOpen && (
         <LendingForm
-          onClose={() => setIsLendingFormOpen(false)}
+          onClose={() => {
+            setIsLendingFormOpen(false)
+            setSelectedTransaction(null)
+          }}
           onTransactionAdded={handleTransactionAdded}
           contacts={contacts}
           userId={userId}
@@ -218,7 +234,10 @@ export default function Dashboard({ userId }: { userId: string }) {
 
       {isBorrowingFormOpen && (
         <BorrowingForm
-          onClose={() => setIsBorrowingFormOpen(false)}
+          onClose={() => {
+            setIsBorrowingFormOpen(false)
+            setSelectedTransaction(null)
+          }}
           onTransactionAdded={handleTransactionAdded}
           contacts={contacts}
           userId={userId}
@@ -234,6 +253,7 @@ export default function Dashboard({ userId }: { userId: string }) {
           onTransactionAdded={handleTransactionAdded}
           transactions={transactions}
           userId={userId}
+          selectedTransaction={selectedTransaction}
         />
       )}
 
@@ -246,6 +266,7 @@ export default function Dashboard({ userId }: { userId: string }) {
           onTransactionAdded={handleTransactionAdded}
           transactions={transactions}
           userId={userId}
+          selectedTransaction={selectedTransaction}
         />
       )}
 

@@ -38,9 +38,16 @@ interface RecoveryFormProps {
   onTransactionAdded: (transaction: Transaction) => void
   transactions: Transaction[]
   userId: string
+  selectedTransaction?: Transaction | null
 }
 
-export default function RecoveryForm({ onClose, onTransactionAdded, transactions, userId }: RecoveryFormProps) {
+export default function RecoveryForm({
+  onClose,
+  onTransactionAdded,
+  transactions,
+  userId,
+  selectedTransaction,
+}: RecoveryFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Filter only lend transactions that haven't been fully recovered
@@ -49,6 +56,7 @@ export default function RecoveryForm({ onClose, onTransactionAdded, transactions
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      transactionId: selectedTransaction?.id || "",
       recoveryType: "full",
       date: new Date(),
       method: "cash",
@@ -59,25 +67,35 @@ export default function RecoveryForm({ onClose, onTransactionAdded, transactions
   const selectedTransactionId = form.watch("transactionId")
   const recoveryType = form.watch("recoveryType")
 
-  const selectedTransaction = lendTransactions.find((t) => t.id === selectedTransactionId)
+  const currentSelectedTransaction = lendTransactions.find((t) => t.id === selectedTransactionId)
 
   // Set default amount when transaction or recovery type changes
   React.useEffect(() => {
-    if (selectedTransaction && recoveryType === "full") {
-      form.setValue("amount", selectedTransaction.amount)
+    if (currentSelectedTransaction && recoveryType === "full") {
+      form.setValue("amount", currentSelectedTransaction.amount)
     }
-  }, [selectedTransactionId, recoveryType, form, selectedTransaction])
+  }, [selectedTransactionId, recoveryType, form, currentSelectedTransaction])
+
+  // Set the selected transaction when it changes
+  React.useEffect(() => {
+    if (selectedTransaction && selectedTransaction.type === "lend") {
+      form.setValue("transactionId", selectedTransaction.id)
+      if (recoveryType === "full") {
+        form.setValue("amount", selectedTransaction.amount)
+      }
+    }
+  }, [selectedTransaction, form, recoveryType])
 
   const onSubmit = async (values: FormValues) => {
-    if (!selectedTransaction) return
+    if (!currentSelectedTransaction) return
 
     setIsSubmitting(true)
     try {
       const newTransaction: Omit<Transaction, "id" | "userId"> = {
         type: "recover",
-        personId: selectedTransaction.personId,
-        personName: selectedTransaction.personName,
-        personPhone: selectedTransaction.personPhone,
+        personId: currentSelectedTransaction.personId,
+        personName: currentSelectedTransaction.personName,
+        personPhone: currentSelectedTransaction.personPhone,
         amount: values.amount,
         date: values.date.toISOString(),
         method: values.method,
@@ -114,7 +132,7 @@ export default function RecoveryForm({ onClose, onTransactionAdded, transactions
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Select Lending to Recover</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!!selectedTransaction}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a lending" />
@@ -182,7 +200,7 @@ export default function RecoveryForm({ onClose, onTransactionAdded, transactions
                       step="0.01"
                       placeholder="0.00"
                       {...field}
-                      disabled={recoveryType === "full" && !!selectedTransaction}
+                      disabled={recoveryType === "full" && !!currentSelectedTransaction}
                     />
                   </FormControl>
                   <FormMessage />
@@ -257,7 +275,7 @@ export default function RecoveryForm({ onClose, onTransactionAdded, transactions
             />
 
             <DialogFooter>
-              <Button type="submit" disabled={isSubmitting || lendTransactions.length === 0}>
+              <Button type="submit" disabled={isSubmitting || !currentSelectedTransaction}>
                 {isSubmitting ? "Saving..." : "Save"}
               </Button>
             </DialogFooter>

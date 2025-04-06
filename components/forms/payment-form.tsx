@@ -36,9 +36,16 @@ interface PaymentFormProps {
   onTransactionAdded: (transaction: Transaction) => void
   transactions: Transaction[]
   userId: string
+  selectedTransaction?: Transaction | null
 }
 
-export default function PaymentForm({ onClose, onTransactionAdded, transactions, userId }: PaymentFormProps) {
+export default function PaymentForm({
+  onClose,
+  onTransactionAdded,
+  transactions,
+  userId,
+  selectedTransaction,
+}: PaymentFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Filter only borrow transactions
@@ -47,6 +54,7 @@ export default function PaymentForm({ onClose, onTransactionAdded, transactions,
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      transactionId: selectedTransaction?.id || "",
       paymentType: "full",
       date: new Date(),
       method: "cash",
@@ -57,25 +65,35 @@ export default function PaymentForm({ onClose, onTransactionAdded, transactions,
   const selectedTransactionId = form.watch("transactionId")
   const paymentType = form.watch("paymentType")
 
-  const selectedTransaction = borrowTransactions.find((t) => t.id === selectedTransactionId)
+  const currentSelectedTransaction = borrowTransactions.find((t) => t.id === selectedTransactionId)
 
   // Set default amount when transaction or payment type changes
   useEffect(() => {
-    if (selectedTransaction && paymentType === "full") {
-      form.setValue("amount", selectedTransaction.amount)
+    if (currentSelectedTransaction && paymentType === "full") {
+      form.setValue("amount", currentSelectedTransaction.amount)
     }
-  }, [selectedTransactionId, paymentType, form, selectedTransaction])
+  }, [selectedTransactionId, paymentType, form, currentSelectedTransaction])
+
+  // Set the selected transaction when it changes
+  useEffect(() => {
+    if (selectedTransaction && selectedTransaction.type === "borrow") {
+      form.setValue("transactionId", selectedTransaction.id)
+      if (paymentType === "full") {
+        form.setValue("amount", selectedTransaction.amount)
+      }
+    }
+  }, [selectedTransaction, form, paymentType])
 
   const onSubmit = async (values: FormValues) => {
-    if (!selectedTransaction) return
+    if (!currentSelectedTransaction) return
 
     setIsSubmitting(true)
     try {
       const newTransaction: Omit<Transaction, "id" | "userId"> = {
         type: "payment",
-        personId: selectedTransaction.personId,
-        personName: selectedTransaction.personName,
-        personPhone: selectedTransaction.personPhone,
+        personId: currentSelectedTransaction.personId,
+        personName: currentSelectedTransaction.personName,
+        personPhone: currentSelectedTransaction.personPhone,
         amount: values.amount,
         date: values.date.toISOString(),
         method: values.method,
@@ -112,7 +130,7 @@ export default function PaymentForm({ onClose, onTransactionAdded, transactions,
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Select Borrowing to Pay</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!!selectedTransaction}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a borrowing" />
@@ -180,7 +198,7 @@ export default function PaymentForm({ onClose, onTransactionAdded, transactions,
                       step="0.01"
                       placeholder="0.00"
                       {...field}
-                      disabled={paymentType === "full" && !!selectedTransaction}
+                      disabled={paymentType === "full" && !!currentSelectedTransaction}
                     />
                   </FormControl>
                   <FormMessage />
@@ -255,7 +273,7 @@ export default function PaymentForm({ onClose, onTransactionAdded, transactions,
             />
 
             <DialogFooter>
-              <Button type="submit" disabled={isSubmitting || borrowTransactions.length === 0}>
+              <Button type="submit" disabled={isSubmitting || !currentSelectedTransaction}>
                 {isSubmitting ? "Saving..." : "Save"}
               </Button>
             </DialogFooter>
