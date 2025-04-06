@@ -50,7 +50,7 @@ export default function ContactList({ onClose, contacts, onContactsUpdated, user
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center">
             Manage Contacts
@@ -66,9 +66,9 @@ export default function ContactList({ onClose, contacts, onContactsUpdated, user
           </Button>
         </div>
 
-        <div className="rounded-md border">
+        <div className="rounded-md border overflow-auto flex-1">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Phone</TableHead>

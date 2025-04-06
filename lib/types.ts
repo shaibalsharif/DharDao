@@ -1,6 +1,6 @@
 export interface Transaction {
   id: string
-  type: "lend" | "borrow" | "recover"
+  type: "lend" | "borrow" | "recover" | "payment"
   personId: string
   personName: string
   personPhone: string
@@ -30,6 +30,21 @@ export interface UserProfile {
   lastLogin: string
 }
 
+export interface DeviceInfo {
+  userAgent: string
+  browser: string
+  os: string
+  device: string
+  language: string
+  timeZone: string
+}
+
+export interface LocationInfo {
+  country?: string
+  region?: string
+  city?: string
+}
+
 export interface Activity {
   id: string
   userId: string
@@ -39,5 +54,7 @@ export interface Activity {
   relatedId?: string
   amount?: number
   timestamp: string
+  deviceInfo?: DeviceInfo
+  location?: string
 }
 

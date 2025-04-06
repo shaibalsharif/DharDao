@@ -15,10 +15,14 @@ import {
 } from "firebase/firestore"
 import type { User } from "firebase/auth"
 import { db } from "@/lib/firebase"
-import type { Activity, Contact, Transaction, UserProfile } from "@/lib/types"
+import type { Activity, Contact, Transaction, UserProfile, DeviceInfo } from "@/lib/types"
 
 // User Management
-export async function createUserIfNotExists(user: User): Promise<UserProfile> {
+export async function createUserIfNotExists(
+  user: User,
+  deviceInfo?: DeviceInfo,
+  locationInfo?: string,
+): Promise<UserProfile> {
   const userRef = doc(db, "users", user.uid)
   const userSnap = await getDoc(userRef)
 
@@ -35,12 +39,14 @@ export async function createUserIfNotExists(user: User): Promise<UserProfile> {
 
     await setDoc(userRef, userData)
 
-    // Log activity
+    // Log activity with device info
     await logActivity(user.uid, {
       type: "auth",
       action: "signup",
       details: "User created account",
       timestamp: new Date().toISOString(),
+      deviceInfo,
+      location: locationInfo,
     })
 
     return userData
@@ -51,12 +57,14 @@ export async function createUserIfNotExists(user: User): Promise<UserProfile> {
       lastLogin: new Date().toISOString(),
     })
 
-    // Log activity
+    // Log activity with device info
     await logActivity(user.uid, {
       type: "auth",
       action: "login",
       details: "User logged in",
       timestamp: new Date().toISOString(),
+      deviceInfo,
+      location: locationInfo,
     })
 
     return userData
@@ -82,6 +90,7 @@ export async function fetchActivities(
     endDate?: Date
     type?: string
     action?: string
+    relatedId?: string
   } = {},
   pageSize = 20,
   lastDoc?: any,
@@ -110,6 +119,10 @@ export async function fetchActivities(
 
   if (filters.action) {
     q = query(q, where("action", "==", filters.action))
+  }
+
+  if (filters.relatedId) {
+    q = query(q, where("relatedId", "==", filters.relatedId))
   }
 
   // Apply pagination
