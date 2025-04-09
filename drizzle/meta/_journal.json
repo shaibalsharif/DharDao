@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1744181600873,
+      "tag": "0000_equal_silhouette",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1744193368199,
+      "tag": "0001_worried_sumo",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1744193914414,
+      "tag": "0002_common_gideon",
+      "breakpoints": true
+    }
+  ]
+}

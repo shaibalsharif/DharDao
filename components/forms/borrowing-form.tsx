@@ -14,13 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import type { Contact, Transaction } from "@/lib/types"
-import { addTransaction } from "@/lib/firebase-utils"
+import { addTransaction } from "@/app/actions"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useToast } from "@/components/ui/use-toast"
 
 const formSchema = z.object({
-  personId: z.string().min(1, "Please select a contact"),
+  contactId: z.string().min(1, "Please select a contact"),
   amount: z.coerce.number().positive("Amount must be positive"),
   date: z.date(),
   returnDate: z.date().optional(),
@@ -39,6 +40,7 @@ interface BorrowingFormProps {
 
 export default function BorrowingForm({ onClose, onTransactionAdded, contacts, userId }: BorrowingFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -52,7 +54,7 @@ export default function BorrowingForm({ onClose, onTransactionAdded, contacts, u
   const onSubmit = async (values: FormValues) => {
     setIsSubmitting(true)
     try {
-      const selectedContact = contacts.find((contact) => contact.id === values.personId)
+      const selectedContact = contacts.find((contact) => contact.id.toString() === values.contactId)
 
       if (!selectedContact) {
         throw new Error("Contact not found")
@@ -60,8 +62,8 @@ export default function BorrowingForm({ onClose, onTransactionAdded, contacts, u
 
       const newTransaction: Omit<Transaction, "id" | "userId"> = {
         type: "borrow",
-        personId: values.personId,
-        personName: selectedContact.name,
+        contactId: values.contactId, // This is already a string from the form
+        contactName: selectedContact.name,
         personPhone: selectedContact.phone,
         amount: values.amount,
         date: values.date.toISOString(),
@@ -72,9 +74,24 @@ export default function BorrowingForm({ onClose, onTransactionAdded, contacts, u
       }
 
       const transactionWithId = await addTransaction(userId, newTransaction)
-      onTransactionAdded(transactionWithId)
+      if (transactionWithId) {
+        toast({
+          title: "Transaction added",
+          description: `Successfully borrowed ${new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "USD",
+          }).format(values.amount)} from ${selectedContact.name}`,
+        })
+        onTransactionAdded(transactionWithId)
+        onClose()
+      }
     } catch (error) {
       console.error("Error adding transaction:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add transaction. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -96,7 +113,7 @@ export default function BorrowingForm({ onClose, onTransactionAdded, contacts, u
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="personId"
+              name="contactId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Contact</FormLabel>
@@ -109,7 +126,7 @@ export default function BorrowingForm({ onClose, onTransactionAdded, contacts, u
                     <SelectContent>
                       {contacts.length > 0 ? (
                         contacts.map((contact) => (
-                          <SelectItem key={contact.id} value={contact.id}>
+                          <SelectItem key={contact.id.toString()} value={contact.id.toString()}>
                             {contact.name} ({contact.phone})
                           </SelectItem>
                         ))
@@ -243,4 +260,3 @@ export default function BorrowingForm({ onClose, onTransactionAdded, contacts, u
     </Dialog>
   )
 }
-

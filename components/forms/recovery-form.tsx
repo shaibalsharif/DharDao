@@ -1,8 +1,6 @@
 "use client"
 
-import React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { CalendarIcon, X } from "lucide-react"
 import { format } from "date-fns"
 
@@ -17,10 +15,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { cn } from "@/lib/utils"
 import type { Transaction } from "@/lib/types"
-import { addTransaction } from "@/lib/firebase-utils"
+import { addTransaction } from "@/app/actions"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useToast } from "@/components/ui/use-toast"
 
 const formSchema = z.object({
   transactionId: z.string().min(1, "Please select a transaction"),
@@ -49,14 +48,29 @@ export default function RecoveryForm({
   selectedTransaction,
 }: RecoveryFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
+
+  // Helper function to check if a lending transaction has been fully recovered
+  const isFullyRecovered = (transaction: Transaction): boolean => {
+    if (transaction.type !== "lend") return false
+
+    // Find all recovery transactions for this person
+    const recoveries = transactions.filter((t) => t.type === "recover" && t.contactId === transaction.contactId)
+
+    // Calculate total recovered amount
+    const totalRecovered = recoveries.reduce((sum, t) => sum + t.amount, 0)
+
+    // Return true if fully recovered
+    return totalRecovered >= transaction.amount
+  }
 
   // Filter only lend transactions that haven't been fully recovered
-  const lendTransactions = transactions.filter((t) => t.type === "lend")
+  const lendTransactions = transactions.filter((t) => t.type === "lend" && !isFullyRecovered(t))
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      transactionId: selectedTransaction?.id || "",
+      transactionId: selectedTransaction?.id?.toString() || "",
       recoveryType: "full",
       date: new Date(),
       method: "cash",
@@ -66,35 +80,72 @@ export default function RecoveryForm({
 
   const selectedTransactionId = form.watch("transactionId")
   const recoveryType = form.watch("recoveryType")
+  const amount = form.watch("amount")
 
-  const currentSelectedTransaction = lendTransactions.find((t) => t.id === selectedTransactionId)
+  const currentSelectedTransaction = lendTransactions.find((t) => t.id.toString() === selectedTransactionId)
+
+  // Calculate remaining amount to be recovered
+  const getRemainingAmount = (): number => {
+    if (!currentSelectedTransaction) return 0
+
+    const recoveries = transactions.filter(
+      (t) => t.type === "recover" && t.contactId === currentSelectedTransaction.contactId,
+    )
+
+    const totalRecovered = recoveries.reduce((sum, t) => sum + t.amount, 0)
+    return Math.max(0, currentSelectedTransaction.amount - totalRecovered)
+  }
+
+  const remainingAmount = getRemainingAmount()
 
   // Set default amount when transaction or recovery type changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (currentSelectedTransaction && recoveryType === "full") {
-      form.setValue("amount", currentSelectedTransaction.amount)
+      form.setValue("amount", remainingAmount)
     }
-  }, [selectedTransactionId, recoveryType, form, currentSelectedTransaction])
+  }, [selectedTransactionId, recoveryType, form, currentSelectedTransaction, remainingAmount])
 
   // Set the selected transaction when it changes
-  React.useEffect(() => {
-    if (selectedTransaction && selectedTransaction.type === "lend") {
-      form.setValue("transactionId", selectedTransaction.id)
+  useEffect(() => {
+    if (selectedTransaction && selectedTransaction.type === "lend" && !isFullyRecovered(selectedTransaction)) {
+      form.setValue("transactionId", selectedTransaction.id.toString())
       if (recoveryType === "full") {
-        form.setValue("amount", selectedTransaction.amount)
+        const remaining = getRemainingAmount()
+        form.setValue("amount", remaining)
       }
     }
   }, [selectedTransaction, form, recoveryType])
 
+  // Validate amount doesn't exceed remaining amount
+  useEffect(() => {
+    if (recoveryType === "partial" && amount > remainingAmount && remainingAmount > 0) {
+      form.setError("amount", {
+        type: "manual",
+        message: `Amount cannot exceed the remaining amount of ${remainingAmount.toFixed(2)}`,
+      })
+    } else {
+      form.clearErrors("amount")
+    }
+  }, [amount, recoveryType, remainingAmount, form])
+
   const onSubmit = async (values: FormValues) => {
     if (!currentSelectedTransaction) return
+
+    // Additional validation
+    if (values.amount > remainingAmount) {
+      form.setError("amount", {
+        type: "manual",
+        message: `Amount cannot exceed the remaining amount of ${remainingAmount.toFixed(2)}`,
+      })
+      return
+    }
 
     setIsSubmitting(true)
     try {
       const newTransaction: Omit<Transaction, "id" | "userId"> = {
         type: "recover",
-        personId: currentSelectedTransaction.personId,
-        personName: currentSelectedTransaction.personName,
+        contactId: currentSelectedTransaction.contactId,
+        contactName: currentSelectedTransaction.contactName,
         personPhone: currentSelectedTransaction.personPhone,
         amount: values.amount,
         date: values.date.toISOString(),
@@ -104,9 +155,24 @@ export default function RecoveryForm({
       }
 
       const transactionWithId = await addTransaction(userId, newTransaction)
-      onTransactionAdded(transactionWithId)
+      if (transactionWithId) {
+        toast({
+          title: "Recovery recorded",
+          description: `Successfully recorded recovery of ${new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "USD",
+          }).format(values.amount)}`,
+        })
+        onTransactionAdded(transactionWithId)
+        onClose()
+      }
     } catch (error) {
       console.error("Error adding recovery transaction:", error)
+      toast({
+        title: "Error",
+        description: "Failed to record recovery. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -141,8 +207,8 @@ export default function RecoveryForm({
                     <SelectContent>
                       {lendTransactions.length > 0 ? (
                         lendTransactions.map((transaction) => (
-                          <SelectItem key={transaction.id} value={transaction.id}>
-                            {transaction.personName} -{" "}
+                          <SelectItem key={transaction.id.toString()} value={transaction.id.toString()}>
+                            {transaction.contactName} -{" "}
                             {new Intl.NumberFormat("en-US", {
                               style: "currency",
                               currency: "USD",
@@ -151,7 +217,7 @@ export default function RecoveryForm({
                         ))
                       ) : (
                         <SelectItem value="no-transactions" disabled>
-                          No lending transactions available
+                          No pending lending transactions available
                         </SelectItem>
                       )}
                     </SelectContent>
@@ -160,6 +226,20 @@ export default function RecoveryForm({
                 </FormItem>
               )}
             />
+
+            {currentSelectedTransaction && (
+              <div className="text-sm bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                <p>
+                  Remaining amount to recover:{" "}
+                  <span className="font-bold">
+                    {new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                    }).format(remainingAmount)}
+                  </span>
+                </p>
+              </div>
+            )}
 
             <FormField
               control={form.control}
@@ -285,4 +365,3 @@ export default function RecoveryForm({
     </Dialog>
   )
 }
-

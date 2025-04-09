@@ -33,8 +33,8 @@ export async function createUserIfNotExists(
       email: user.email || "",
       displayName: user.displayName || "",
       photoURL: user.photoURL || "",
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString(),
+      createdAt: new Date()?.toISOString(),
+      lastLogin: new Date()?.toISOString(),
     }
 
     await setDoc(userRef, userData)
@@ -44,7 +44,7 @@ export async function createUserIfNotExists(
       type: "auth",
       action: "signup",
       details: "User created account",
-      timestamp: new Date().toISOString(),
+      timestamp: new Date()?.toISOString(),
       deviceInfo,
       location: locationInfo,
     })
@@ -54,7 +54,7 @@ export async function createUserIfNotExists(
     // Update last login
     const userData = userSnap.data() as UserProfile
     await updateDoc(userRef, {
-      lastLogin: new Date().toISOString(),
+      lastLogin: new Date()?.toISOString(),
     })
 
     // Log activity with device info
@@ -62,7 +62,7 @@ export async function createUserIfNotExists(
       type: "auth",
       action: "login",
       details: "User logged in",
-      timestamp: new Date().toISOString(),
+      timestamp: new Date()?.toISOString(),
       deviceInfo,
       location: locationInfo,
     })
@@ -107,10 +107,10 @@ export async function fetchActivities(
     const startDate = filters.startDate || threeMonthsAgo
     const endDate = filters.endDate || new Date()
 
-    q = query(q, where("timestamp", ">=", startDate.toISOString()), where("timestamp", "<=", endDate.toISOString()))
+    q = query(q, where("timestamp", ">=", startDate?.toISOString()), where("timestamp", "<=", endDate?.toISOString()))
   } else {
     // Default to last 3 months
-    q = query(q, where("timestamp", ">=", threeMonthsAgo.toISOString()))
+    q = query(q, where("timestamp", ">=", threeMonthsAgo?.toISOString()))
   }
 
   if (filters.type) {
@@ -171,10 +171,10 @@ export async function addTransaction(
   await logActivity(userId, {
     type: "transaction",
     action: `add_${transaction.type}`,
-    details: `Added ${transaction.type} transaction of ${transaction.amount} with ${transaction.personName}`,
+    details: `Added ${transaction.type} transaction of ${transaction.amount} with ${transaction.contactName}`,
     relatedId: docRef.id,
     amount: transaction.amount,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date()?.toISOString(),
   })
 
   return {
@@ -206,7 +206,7 @@ export async function addContact(userId: string, contact: Omit<Contact, "id" | "
     action: "add",
     details: `Added contact: ${contact.name}`,
     relatedId: docRef.id,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date()?.toISOString(),
   })
 
   return {
@@ -232,7 +232,7 @@ export async function updateContact(
     action: "update",
     details: `Updated contact: ${contact.name}`,
     relatedId: contact.id,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date()?.toISOString(),
   })
 
   return {
@@ -250,7 +250,6 @@ export async function deleteContact(userId: string, contactId: string, contactNa
     action: "delete",
     details: `Deleted contact: ${contactName}`,
     relatedId: contactId,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date()?.toISOString(),
   })
 }
-

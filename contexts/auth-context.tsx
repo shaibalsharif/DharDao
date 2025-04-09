@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { type User, onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth"
 import { auth } from "@/lib/firebase"
-import { createUserIfNotExists } from "@/lib/firebase-utils"
 import { useToast } from "@/components/ui/use-toast"
 
 interface AuthContextType {
@@ -26,31 +25,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast()
 
   useEffect(() => {
+    // We'll handle persistence in the signIn functions instead
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Create user in Firestore if they don't exist
-        try {
-          // Get user device and location information
-          const userAgent = navigator.userAgent
-          const deviceInfo = {
-            userAgent,
-            browser: getBrowserInfo(userAgent),
-            os: getOSInfo(userAgent),
-            device: getDeviceInfo(userAgent),
-            language: navigator.language,
-            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          }
-
-          // Get approximate location based on timezone
-          const locationInfo = getLocationFromTimezone(deviceInfo.timeZone)
-
-          await createUserIfNotExists(user, deviceInfo, locationInfo)
-        } catch (error) {
-          console.error("Error creating user:", error)
-        }
+        // Don't try to create the user here - this will be handled by the auth form
+        // Just set the user state
+        setUser(user)
+      } else {
+        setUser(null)
       }
-
-      setUser(user)
       setLoading(false)
       console.log("Auth state changed:", user ? "User logged in" : "No user")
     })
@@ -158,4 +141,3 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return <AuthContext.Provider value={{ user, loading, signOut }}>{children}</AuthContext.Provider>
 }
-

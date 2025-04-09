@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import type { Contact } from "@/lib/types"
-import { addContact, updateContact } from "@/lib/firebase-utils"
+import { addContact, updateContact } from "@/app/actions"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -51,8 +51,12 @@ export default function ContactForm({ onClose, onContactSaved, contacts, contact
           createdAt: contactToEdit.createdAt,
         })
 
-        const updatedContacts = contacts.map((c) => (c.id === updatedContact.id ? updatedContact : c))
-        onContactSaved(updatedContacts)
+        if (updatedContact) {
+          const updatedContacts = contacts.map((c) =>
+            c.id.toString() === updatedContact.id.toString() ? updatedContact : c,
+          )
+          onContactSaved(updatedContacts)
+        }
       } else {
         // Add new contact
         const newContact: Omit<Contact, "id" | "userId"> = {
@@ -62,7 +66,9 @@ export default function ContactForm({ onClose, onContactSaved, contacts, contact
         }
 
         const contactWithId = await addContact(userId, newContact)
-        onContactSaved([...contacts, contactWithId])
+        if (contactWithId) {
+          onContactSaved([...contacts, contactWithId])
+        }
       }
     } catch (error) {
       console.error("Error saving contact:", error)
@@ -124,4 +130,3 @@ export default function ContactForm({ onClose, onContactSaved, contacts, contact
     </Dialog>
   )
 }
-

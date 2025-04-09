@@ -15,7 +15,7 @@ const requiredEnvVars = [
 const missingEnvVars = requiredEnvVars.filter((varName) => !process.env[varName])
 
 if (missingEnvVars.length > 0) {
-  console.log(`Missing required environment variables: ${missingEnvVars.join(", ")}`)
+  console.error(`Missing required environment variables: ${missingEnvVars.join(", ")}`)
 }
 
 const firebaseConfig = {
@@ -28,18 +28,8 @@ const firebaseConfig = {
 }
 
 // Initialize Firebase
-let app
-let auth
-let db
-
-try {
-  app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
-  auth = getAuth(app)
-  db = getFirestore(app)
-  console.log("Firebase initialized successfully")
-} catch (error) {
-  console.error("Error initializing Firebase:", error)
-}
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
+const auth = getAuth(app)
+const db = getFirestore(app)
 
 export { app, auth, db }
-

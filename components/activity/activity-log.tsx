@@ -15,7 +15,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn, formatCurrency } from "@/lib/utils"
 import type { Activity } from "@/lib/types"
-import { fetchActivities } from "@/lib/firebase-utils"
+import { fetchActivities } from "@/app/actions"
 
 interface ActivityLogProps {
   userId: string
@@ -38,8 +38,8 @@ export default function ActivityLog({
 }: ActivityLogProps) {
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
-  const [lastDoc, setLastDoc] = useState<any>(null)
   const [hasMore, setHasMore] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null)
 
@@ -76,11 +76,8 @@ export default function ActivityLog({
     }
   }, [initialStartDate, initialEndDate, initialActivityType, initialActionType, initialRelatedId])
 
-  const loadActivities = async (reset = true) => {
-    if (reset) {
-      setLoading(true)
-    }
-
+  const loadActivities = async () => {
+    setLoading(true)
     try {
       const filters = {
         startDate,
@@ -90,16 +87,11 @@ export default function ActivityLog({
         relatedId: relatedId || undefined,
       }
 
-      const result = await fetchActivities(userId, filters, 20, reset ? undefined : lastDoc)
+      const result = await fetchActivities(userId, filters, currentPage)
 
-      if (reset) {
-        setActivities(result.activities)
-      } else {
-        setActivities((prev) => [...prev, ...result.activities])
-      }
-
-      setLastDoc(result.lastDoc)
-      setHasMore(result.activities.length === 20)
+      setActivities(result.activities)
+      setHasMore(result.hasMore)
+      setCurrentPage(1)
     } catch (error) {
       console.error("Error loading activities:", error)
     } finally {
@@ -107,8 +99,30 @@ export default function ActivityLog({
     }
   }
 
+  const loadMoreActivities = async () => {
+    try {
+      const filters = {
+        startDate,
+        endDate,
+        type: activityType || undefined,
+        action: actionType || undefined,
+        relatedId: relatedId || undefined,
+      }
+
+      const nextPage = currentPage + 1
+      const result = await fetchActivities(userId, filters, nextPage)
+
+      setActivities((prev) => [...prev, ...result.activities])
+      setHasMore(result.hasMore)
+      setCurrentPage(nextPage)
+    } catch (error) {
+      console.error("Error loading more activities:", error)
+    }
+  }
+
   const applyFilters = () => {
     setIsFilterOpen(false)
+    setCurrentPage(1)
     loadActivities()
   }
 
@@ -120,6 +134,7 @@ export default function ActivityLog({
     setRelatedId(null)
     setIsFilterOpen(false)
     setHasExternalFilters(false)
+    setCurrentPage(1)
 
     if (onResetFilters) {
       onResetFilters()
@@ -137,9 +152,6 @@ export default function ActivityLog({
         if (activity.action.includes("lend")) return "💸"
         if (activity.action.includes("borrow")) return "💰"
         if (activity.action.includes("recover")) return "🔄"
-        return "💱"
-      case "contact":
-        if (activity.action === "add") return "🔄"
         return "💱"
       case "contact":
         if (activity.action === "add") return "👤"
@@ -269,7 +281,7 @@ export default function ActivityLog({
 
             {hasMore && (
               <div className="mt-4 flex justify-center">
-                <Button variant="outline" onClick={() => loadActivities(false)} disabled={loading}>
+                <Button variant="outline" onClick={loadMoreActivities} disabled={loading}>
                   {loading ? "Loading..." : "Load More"}
                 </Button>
               </div>
@@ -394,4 +406,3 @@ export default function ActivityLog({
     </Card>
   )
 }
-

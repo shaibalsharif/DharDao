@@ -108,4 +108,3 @@ export default function MonthlyChart({ transactions }: { transactions: Transacti
     </Card>
   )
 }
-

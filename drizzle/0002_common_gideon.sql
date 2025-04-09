@@ -1,0 +1,1 @@
+ALTER TABLE "transactions" ALTER COLUMN "contact_id" SET DATA TYPE serial;

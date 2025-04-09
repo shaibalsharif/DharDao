@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { format } from "date-fns"
 import { ArrowDownIcon, ArrowUpIcon, RotateCcw, RefreshCw, DollarSign, Check } from "lucide-react"
 
@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { Transaction } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
+import PersonTransactions from "@/components/person/person-transactions"
 
 interface TransactionTableProps {
   transactions: Transaction[]
@@ -33,6 +34,10 @@ export default function TransactionTable({
   onViewActivity,
 }: TransactionTableProps) {
   const [currentPage, setCurrentPage] = useState(1)
+  const [selectedPerson, setSelectedPerson] = useState<{ id: string; name: string } | null>(null)
+
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null)
+  const [isLongPressing, setIsLongPressing] = useState(false)
   const itemsPerPage = 10
 
   // Sort transactions by date (newest first)
@@ -53,15 +58,15 @@ export default function TransactionTable({
   const getMethodIcon = (method?: string) => {
     switch (method) {
       case "cash":
-        return "💵"
+        return <i className="w-8   mx-auto " > <img src="/icons/cash.png" /></i>
       case "bKash":
-        return "📱"
+        return <i className="w-8   mx-auto " > <img src="/icons/bKash.png" /></i>
       case "Nogod":
-        return "📲"
+        return <i className="w-8   mx-auto " > <img src="/icons/nogod.png" /></i>
       case "rocket":
-        return "🚀"
+        return <i className="w-8   mx-auto " > <img src="/icons/rocket.png" /></i>
       case "bank":
-        return "🏦"
+        return <i className="w-8   mx-auto " > <img src="/icons/bank.png" /></i>
       default:
         return "💰"
     }
@@ -72,7 +77,7 @@ export default function TransactionTable({
     if (transaction.type !== "lend") return false
 
     // Find recovery transactions for this person
-    const recoveries = sortedTransactions.filter((t) => t.type === "recover" && t.personId === transaction.personId)
+    const recoveries = sortedTransactions.filter((t) => t.type === "recover" && t.contactId === transaction.contactId)
 
     // Calculate total recovered amount
     const totalRecovered = recoveries.reduce((sum, t) => sum + t.amount, 0)
@@ -86,7 +91,7 @@ export default function TransactionTable({
     if (transaction.type !== "borrow") return false
 
     // Find payment transactions for this person
-    const payments = sortedTransactions.filter((t) => t.type === "payment" && t.personId === transaction.personId)
+    const payments = sortedTransactions.filter((t) => t.type === "payment" && t.contactId === transaction.contactId)
 
     // Calculate total paid amount
     const totalPaid = payments.reduce((sum, t) => sum + t.amount, 0)
@@ -102,6 +107,36 @@ export default function TransactionTable({
     }
   }
 
+  // Handle long press on person name
+  const handlecontactNameMouseDown = (transaction: Transaction) => {
+    setIsLongPressing(true)
+    const timer = setTimeout(() => {
+      setSelectedPerson({
+        id: transaction.contactId,
+        name: transaction.contactName,
+      })
+    }, 800) // 800ms long press
+
+    setLongPressTimer(timer)
+  }
+
+  const handlecontactNameMouseUp = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer)
+      setLongPressTimer(null)
+    }
+    setIsLongPressing(false)
+  }
+
+  // Clear timer on component unmount
+  useEffect(() => {
+    return () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer)
+      }
+    }
+  }, [longPressTimer])
+
   return (
     <div className="space-y-4 h-full flex flex-col">
       <div className="flex-1 overflow-auto">
@@ -116,27 +151,25 @@ export default function TransactionTable({
                 <CardContent className="p-0">
                   <div className="flex flex-col">
                     <div
-                      className={`p-3 flex justify-between items-center ${
-                        transaction.type === "lend"
-                          ? "bg-green-50 dark:bg-green-900/20"
-                          : transaction.type === "borrow"
-                            ? "bg-red-50 dark:bg-red-900/20"
-                            : transaction.type === "recover"
-                              ? "bg-blue-50 dark:bg-blue-900/20"
-                              : "bg-purple-50 dark:bg-purple-900/20"
-                      }`}
+                      className={`p-3 flex justify-between items-center ${transaction.type === "lend"
+                        ? "bg-green-50 dark:bg-green-900/20"
+                        : transaction.type === "borrow"
+                          ? "bg-red-50 dark:bg-red-900/20"
+                          : transaction.type === "recover"
+                            ? "bg-blue-50 dark:bg-blue-900/20"
+                            : "bg-purple-50 dark:bg-purple-900/20"
+                        }`}
                     >
                       <div className="flex items-center">
                         <div
-                          className={`rounded-full p-2 mr-3 ${
-                            transaction.type === "lend"
-                              ? "bg-green-100 dark:bg-green-800"
-                              : transaction.type === "borrow"
-                                ? "bg-red-100 dark:bg-red-800"
-                                : transaction.type === "recover"
-                                  ? "bg-blue-100 dark:bg-blue-800"
-                                  : "bg-purple-100 dark:bg-purple-800"
-                          }`}
+                          className={`rounded-full p-2 mr-3 ${transaction.type === "lend"
+                            ? "bg-green-100 dark:bg-green-800"
+                            : transaction.type === "borrow"
+                              ? "bg-red-100 dark:bg-red-800"
+                              : transaction.type === "recover"
+                                ? "bg-blue-100 dark:bg-blue-800"
+                                : "bg-purple-100 dark:bg-purple-800"
+                            }`}
                         >
                           {transaction.type === "lend" ? (
                             <ArrowUpIcon className="h-5 w-5 text-green-600 dark:text-green-300" />
@@ -165,18 +198,17 @@ export default function TransactionTable({
                       </div>
                       <div className="text-right">
                         <div
-                          className={`text-lg font-bold ${
-                            transaction.type === "lend"
-                              ? "text-green-600 dark:text-green-400"
-                              : transaction.type === "borrow"
-                                ? "text-red-600 dark:text-red-400"
-                                : "text-blue-600 dark:text-blue-400"
-                          }`}
+                          className={`text-lg font-bold ${transaction.type === "lend"
+                            ? "text-green-600 dark:text-green-400"
+                            : transaction.type === "borrow"
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-blue-600 dark:text-blue-400"
+                            }`}
                         >
                           {formatCurrency(transaction.amount)}
                         </div>
                         <div className="text-sm text-muted-foreground flex items-center justify-end">
-                          {getMethodIcon(transaction.method)} {transaction.method || "Cash"}
+                          {getMethodIcon(transaction.method)}
                         </div>
                       </div>
                     </div>
@@ -184,7 +216,16 @@ export default function TransactionTable({
                     <div className="p-4">
                       <div className="flex justify-between items-center">
                         <div>
-                          <div className="font-medium">{transaction.personName}</div>
+                          <div
+                            className={`font-medium cursor-pointer ${isLongPressing ? "bg-gray-100 dark:bg-gray-800" : ""}`}
+                            onMouseDown={() => handlecontactNameMouseDown(transaction)}
+                            onMouseUp={handlecontactNameMouseUp}
+                            onMouseLeave={handlecontactNameMouseUp}
+                            onTouchStart={() => handlecontactNameMouseDown(transaction)}
+                            onTouchEnd={handlecontactNameMouseUp}
+                          >
+                            {transaction.contactName}
+                          </div>
                           <div className="text-sm text-muted-foreground">{transaction.personPhone}</div>
                           {transaction.notes && (
                             <div className="text-sm mt-2 text-muted-foreground">
@@ -287,7 +328,18 @@ export default function TransactionTable({
           </PaginationContent>
         </Pagination>
       )}
+
+      {selectedPerson && (
+        <PersonTransactions
+          contactId={selectedPerson.id}
+          contactName={selectedPerson.name}
+          transactions={transactions}
+          onClose={() => setSelectedPerson(null)}
+          onRecoverTransaction={onRecoverTransaction}
+          onPayTransaction={onPayTransaction}
+          onViewActivity={onViewActivity}
+        />
+      )}
     </div>
   )
 }
-

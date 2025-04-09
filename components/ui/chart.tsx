@@ -28,4 +28,3 @@ export const ChartContainer = ({ children, className, ...props }: React.HTMLAttr
 export const ChartTooltip = ({ content, ...props }: any) => {
   return <Tooltip content={content} {...props} />
 }
-

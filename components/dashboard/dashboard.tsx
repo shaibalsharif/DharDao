@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   PlusCircle,
   LogOut,
@@ -27,12 +27,15 @@ import PaymentForm from "@/components/forms/payment-form"
 import ContactList from "@/components/contacts/contact-list"
 import ContactForm from "@/components/contacts/contact-form"
 import ActivityLog from "@/components/activity/activity-log"
-import { fetchTransactions, fetchContacts } from "@/lib/firebase-utils"
+import { fetchTransactions, fetchContacts } from "@/app/actions"
 import type { Transaction, Contact } from "@/lib/types"
 import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/components/ui/use-toast"
+import ProfilePhoto from "@/components/profile/profile-photo"
 
 export default function Dashboard({ userId }: { userId: string }) {
   const { signOut, user } = useAuth()
+  const { toast } = useToast()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
   const [isLendingFormOpen, setIsLendingFormOpen] = useState(false)
@@ -45,6 +48,7 @@ export default function Dashboard({ userId }: { userId: string }) {
   const [activeTab, setActiveTab] = useState("dashboard")
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+  const [dataLoaded, setDataLoaded] = useState(false)
 
   // Activity filter states
   const [activityStartDate, setActivityStartDate] = useState<Date | undefined>(undefined)
@@ -53,24 +57,36 @@ export default function Dashboard({ userId }: { userId: string }) {
   const [activityAction, setActivityAction] = useState<string | null>(null)
   const [activityRelatedId, setActivityRelatedId] = useState<string | null>(null)
 
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true)
-      try {
-        const transactionsData = await fetchTransactions(userId)
-        setTransactions(transactionsData)
+  const loadData = useCallback(async () => {
+    if (!userId || dataLoaded) return
 
-        const contactsData = await fetchContacts(userId)
-        setContacts(contactsData)
-      } catch (error) {
-        console.error("Error loading data:", error)
-      } finally {
-        setIsLoading(false)
-      }
+    setIsLoading(true)
+    try {
+      
+      
+      const transactionsData = await fetchTransactions(userId)
+      setTransactions(transactionsData)
+
+      const contactsData = await fetchContacts(userId)
+      setContacts(contactsData)
+      setDataLoaded(true)
+    } catch (error) {
+      console.error("Error loading data:", error)
+      toast({
+        title: "Error loading data",
+        description: "There was a problem loading your data. Please try refreshing the page.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
+  }, [userId, dataLoaded, toast])
 
-    loadData()
-  }, [userId])
+  useEffect(() => {
+    if (userId && !dataLoaded) {
+      loadData()
+    }
+  }, [userId, dataLoaded, loadData])
 
   const handleTransactionAdded = (newTransaction: Transaction) => {
     setTransactions((prev) => [newTransaction, ...prev])
@@ -113,7 +129,7 @@ export default function Dashboard({ userId }: { userId: string }) {
     setActivityStartDate(startDate)
     setActivityEndDate(endDate)
     setActivityType("transaction")
-    setActivityRelatedId(transaction.id)
+    setActivityRelatedId(transaction.id.toString())
 
     // Switch to activity tab
     setActiveTab("activity")
@@ -276,6 +292,10 @@ export default function Dashboard({ userId }: { userId: string }) {
           contacts={contacts}
           onContactsUpdated={handleContactUpdated}
           userId={userId}
+          transactions={transactions}
+          onRecoverTransaction={handleRecoverTransaction}
+          onPayTransaction={handlePayTransaction}
+          onViewActivity={handleViewTransactionActivity}
         />
       )}
 
@@ -292,20 +312,22 @@ export default function Dashboard({ userId }: { userId: string }) {
       <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col items-center mb-4">
-            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-2">
-              {user?.photoURL ? (
-                <img
-                  src={user.photoURL || "/placeholder.svg"}
-                  alt={user?.displayName || "User"}
-                  className="h-14 w-14 rounded-full"
-                />
-              ) : (
-                <span className="text-2xl font-bold">
-                  {user?.displayName?.charAt(0) || user?.email?.charAt(0) || "U"}
-                </span>
-              )}
-            </div>
-            <h2 className="text-xl font-semibold">{user?.displayName || user?.email}</h2>
+            <ProfilePhoto
+              userId={userId}
+              photoURL={user?.photoURL || null}
+              displayName={user?.displayName || null}
+              email={user?.email || null}
+              onPhotoUpdated={(newPhotoURL) => {
+                // Update the user object with the new photo URL
+                if (user) {
+                  // This is a workaround since we can't directly modify the user object
+                  const updatedUser = Object.assign({}, user, { photoURL: newPhotoURL })
+                  // You might need to implement a state update mechanism here
+                  // or refresh the page to see the changes
+                }
+              }}
+            />
+            <h2 className="text-xl font-semibold mt-2">{user?.displayName || user?.email}</h2>
           </div>
 
           <div className="grid grid-cols-1 gap-2">
@@ -391,4 +413,3 @@ export default function Dashboard({ userId }: { userId: string }) {
     </div>
   )
 }
-

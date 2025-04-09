@@ -15,10 +15,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { cn } from "@/lib/utils"
 import type { Transaction } from "@/lib/types"
-import { addTransaction } from "@/lib/firebase-utils"
+import { addTransaction } from "@/app/actions"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useToast } from "@/components/ui/use-toast"
 
 const formSchema = z.object({
   transactionId: z.string().min(1, "Please select a transaction"),
@@ -47,14 +48,29 @@ export default function PaymentForm({
   selectedTransaction,
 }: PaymentFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
 
-  // Filter only borrow transactions
-  const borrowTransactions = transactions.filter((t) => t.type === "borrow")
+  // Helper function to check if a borrowing transaction has been fully paid
+  const isFullyPaid = (transaction: Transaction): boolean => {
+    if (transaction.type !== "borrow") return false
+
+    // Find all payment transactions for this person
+    const payments = transactions.filter((t) => t.type === "payment" && t.contactId === transaction.contactId)
+
+    // Calculate total paid amount
+    const totalPaid = payments.reduce((sum, t) => sum + t.amount, 0)
+
+    // Return true if fully paid
+    return totalPaid >= transaction.amount
+  }
+
+  // Filter only borrow transactions that haven't been fully paid
+  const borrowTransactions = transactions.filter((t) => t.type === "borrow" && !isFullyPaid(t))
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      transactionId: selectedTransaction?.id || "",
+      transactionId: selectedTransaction?.id?.toString() || "",
       paymentType: "full",
       date: new Date(),
       method: "cash",
@@ -64,35 +80,72 @@ export default function PaymentForm({
 
   const selectedTransactionId = form.watch("transactionId")
   const paymentType = form.watch("paymentType")
+  const amount = form.watch("amount")
 
-  const currentSelectedTransaction = borrowTransactions.find((t) => t.id === selectedTransactionId)
+  const currentSelectedTransaction = borrowTransactions.find((t) => t.id.toString() === selectedTransactionId)
+
+  // Calculate remaining amount to be paid
+  const getRemainingAmount = (): number => {
+    if (!currentSelectedTransaction) return 0
+
+    const payments = transactions.filter(
+      (t) => t.type === "payment" && t.contactId === currentSelectedTransaction.contactId,
+    )
+
+    const totalPaid = payments.reduce((sum, t) => sum + t.amount, 0)
+    return Math.max(0, currentSelectedTransaction.amount - totalPaid)
+  }
+
+  const remainingAmount = getRemainingAmount()
 
   // Set default amount when transaction or payment type changes
   useEffect(() => {
     if (currentSelectedTransaction && paymentType === "full") {
-      form.setValue("amount", currentSelectedTransaction.amount)
+      form.setValue("amount", remainingAmount)
     }
-  }, [selectedTransactionId, paymentType, form, currentSelectedTransaction])
+  }, [selectedTransactionId, paymentType, form, currentSelectedTransaction, remainingAmount])
 
   // Set the selected transaction when it changes
   useEffect(() => {
-    if (selectedTransaction && selectedTransaction.type === "borrow") {
-      form.setValue("transactionId", selectedTransaction.id)
+    if (selectedTransaction && selectedTransaction.type === "borrow" && !isFullyPaid(selectedTransaction)) {
+      form.setValue("transactionId", selectedTransaction.id.toString())
       if (paymentType === "full") {
-        form.setValue("amount", selectedTransaction.amount)
+        const remaining = getRemainingAmount()
+        form.setValue("amount", remaining)
       }
     }
   }, [selectedTransaction, form, paymentType])
 
+  // Validate amount doesn't exceed remaining amount
+  useEffect(() => {
+    if (paymentType === "partial" && amount > remainingAmount && remainingAmount > 0) {
+      form.setError("amount", {
+        type: "manual",
+        message: `Amount cannot exceed the remaining amount of ${remainingAmount.toFixed(2)}`,
+      })
+    } else {
+      form.clearErrors("amount")
+    }
+  }, [amount, paymentType, remainingAmount, form])
+
   const onSubmit = async (values: FormValues) => {
     if (!currentSelectedTransaction) return
+
+    // Additional validation
+    if (values.amount > remainingAmount) {
+      form.setError("amount", {
+        type: "manual",
+        message: `Amount cannot exceed the remaining amount of ${remainingAmount.toFixed(2)}`,
+      })
+      return
+    }
 
     setIsSubmitting(true)
     try {
       const newTransaction: Omit<Transaction, "id" | "userId"> = {
         type: "payment",
-        personId: currentSelectedTransaction.personId,
-        personName: currentSelectedTransaction.personName,
+        contactId: currentSelectedTransaction.contactId,
+        contactName: currentSelectedTransaction.contactName,
         personPhone: currentSelectedTransaction.personPhone,
         amount: values.amount,
         date: values.date.toISOString(),
@@ -102,9 +155,24 @@ export default function PaymentForm({
       }
 
       const transactionWithId = await addTransaction(userId, newTransaction)
-      onTransactionAdded(transactionWithId)
+      if (transactionWithId) {
+        toast({
+          title: "Payment recorded",
+          description: `Successfully recorded payment of ${new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "USD",
+          }).format(values.amount)}`,
+        })
+        onTransactionAdded(transactionWithId)
+        onClose()
+      }
     } catch (error) {
       console.error("Error adding payment transaction:", error)
+      toast({
+        title: "Error",
+        description: "Failed to record payment. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -139,8 +207,8 @@ export default function PaymentForm({
                     <SelectContent>
                       {borrowTransactions.length > 0 ? (
                         borrowTransactions.map((transaction) => (
-                          <SelectItem key={transaction.id} value={transaction.id}>
-                            {transaction.personName} -{" "}
+                          <SelectItem key={transaction.id.toString()} value={transaction.id.toString()}>
+                            {transaction.contactName} -{" "}
                             {new Intl.NumberFormat("en-US", {
                               style: "currency",
                               currency: "USD",
@@ -149,7 +217,7 @@ export default function PaymentForm({
                         ))
                       ) : (
                         <SelectItem value="no-transactions" disabled>
-                          No borrowing transactions available
+                          No pending borrowing transactions available
                         </SelectItem>
                       )}
                     </SelectContent>
@@ -158,6 +226,20 @@ export default function PaymentForm({
                 </FormItem>
               )}
             />
+
+            {currentSelectedTransaction && (
+              <div className="text-sm bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                <p>
+                  Remaining amount to pay:{" "}
+                  <span className="font-bold">
+                    {new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                    }).format(remainingAmount)}
+                  </span>
+                </p>
+              </div>
+            )}
 
             <FormField
               control={form.control}
@@ -283,4 +365,3 @@ export default function PaymentForm({
     </Dialog>
   )
 }
-
