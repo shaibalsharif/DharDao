@@ -1,5 +1,6 @@
 import { pgTable, serial, text, timestamp, varchar, decimal, boolean } from "drizzle-orm/pg-core"
-import { relations } from "drizzle-orm";
+import { relations } from "drizzle-orm"
+
 // Users table
 export const users = pgTable("users", {
   id: text("id").primaryKey(), // Firebase UID
@@ -58,18 +59,15 @@ export const activities = pgTable("activities", {
   location: text("location"),
 })
 
+// Let's also make sure the relations are properly defined to include the userId filter
 
-
-export const contactsRelations = relations(contacts, ({ many }) => ({
-  transactions: many(transactions),
-}));
-
+// Update the transactionsRelations definition:
 export const transactionsRelations = relations(transactions, ({ one }) => ({
   contact: one(contacts, {
-    fields: [transactions.contactId],
-    references: [contacts.id],
+    fields: [transactions.contactId, transactions.userId],
+    references: [contacts.id, contacts.userId],
   }),
-}));
+}))
 
 // Export all tables for use with Drizzle ORM
 export {

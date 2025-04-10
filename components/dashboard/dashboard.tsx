@@ -33,6 +33,12 @@ import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/components/ui/use-toast"
 import ProfilePhoto from "@/components/profile/profile-photo"
 
+
+const filterDeletedContacts = (contacts: Contact[]) => {
+  return contacts.filter((contact) => !contact.isDeleted)
+}
+
+
 export default function Dashboard({ userId }: { userId: string }) {
   const { signOut, user } = useAuth()
   const { toast } = useToast()
@@ -243,7 +249,7 @@ export default function Dashboard({ userId }: { userId: string }) {
             setSelectedTransaction(null)
           }}
           onTransactionAdded={handleTransactionAdded}
-          contacts={contacts}
+          contacts={filterDeletedContacts(contacts)}
           userId={userId}
         />
       )}
@@ -255,7 +261,7 @@ export default function Dashboard({ userId }: { userId: string }) {
             setSelectedTransaction(null)
           }}
           onTransactionAdded={handleTransactionAdded}
-          contacts={contacts}
+          contacts={filterDeletedContacts(contacts)}
           userId={userId}
         />
       )}

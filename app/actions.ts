@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db/index"
 import { contacts, transactions, activities, users } from "@/lib/db/schema"
-import { eq, desc, and, gte, lte } from "drizzle-orm"
+import { eq, desc, and, gte, lte, asc } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import type { Contact, Transaction, Activity, DeviceInfo } from "@/lib/types"
 
@@ -110,15 +110,22 @@ export async function updateUserPhoto(userId: string, photoURL: string): Promise
 }
 
 // Contacts
-export async function fetchContacts(userId: string, includeDeleted = false): Promise<Contact[]> {
-  try {
-    let query = db.select().from(contacts).where(eq(contacts.userId, userId))
 
+
+export async function fetchContacts(userId: string, includeDeleted = true): Promise<Contact[]> {
+  try {
+    let whereClause = eq(contacts.userId, userId);
+
+    // Add `isDeleted = false` if not including deleted
     if (!includeDeleted) {
-      query = query.where(eq(contacts.isDeleted, false))
+      whereClause = and(whereClause, eq(contacts.isDeleted, false));
     }
 
-    const result = await query.orderBy(contacts.name)
+    const result = await db
+      .select()
+      .from(contacts)
+      .where(whereClause)
+      .orderBy(asc(contacts.isDeleted), asc(contacts.name)); // Non-deleted first, then sort by name
 
     return result.map((contact) => ({
       id: contact.id.toString(),
@@ -128,10 +135,10 @@ export async function fetchContacts(userId: string, includeDeleted = false): Pro
       isDeleted: contact.isDeleted,
       createdAt: contact.createdAt.toISOString(),
       updatedAt: contact.updatedAt.toISOString(),
-    }))
+    }));
   } catch (error) {
-    console.error("Error fetching contacts:", error)
-    return []
+    console.error("Error fetching contacts:", error);
+    return [];
   }
 }
 
@@ -153,7 +160,7 @@ export async function addContact(
         updatedAt: now,
       })
       .returning()
-console.log(result)
+
     if (!result) return null
 
     // Log activity
@@ -336,13 +343,17 @@ export async function deleteContact(
 // Transactions
 export async function fetchTransactions(userId: string): Promise<Transaction[]> {
   try {
+    // Make sure to filter by userId in the query
     const result = await db.query.transactions.findMany({
       where: eq(transactions.userId, userId),
       orderBy: desc(transactions.createdAt),
       with: {
-        contact: true, // Changed from 'contacts' to 'contact'
+        contact: {
+          // This ensures we only get contacts that belong to this user
+          where: eq(contacts.userId, userId),
+        },
       },
-    });
+    })
 
     return result.map((transaction) => ({
       id: transaction.id.toString(),
@@ -368,7 +379,7 @@ export async function fetchTransactions(userId: string): Promise<Transaction[]> 
 
 export async function addTransaction(
   userId: string,
-  transaction: Omit<Transaction, "id" | "userId" | "updatedAt" | "contactName" | "personPhone" | "personDeleted">,
+  transaction: Omit<Transaction, "id" | "userId" | "updatedAt" | "personName" | "personPhone" | "personDeleted">,
 ): Promise<Transaction | null> {
   try {
     const now = new Date()
@@ -420,7 +431,7 @@ export async function addTransaction(
       id: result.id.toString(),
       type: result.type as "lend" | "borrow" | "recover" | "payment",
       contactId: result.contactId.toString(),
-      contactName: contactInfo.name,
+      personName: contactInfo.name,
       personPhone: contactInfo.phone,
       personDeleted: contactInfo.isDeleted,
       amount: Number(result.amount),
@@ -534,9 +545,8 @@ export async function fetchActivities(
     const offset = (page - 1) * pageSize
 
     // Execute query
-    
     const result = await db.query.activities.findMany({
-      where: eq(activities.userId, userId),
+      where: and(...conditions),
       orderBy: desc(activities.timestamp),
       limit: pageSize + 1, // Get one extra to check if there are more
       offset,
