@@ -7,7 +7,7 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
-export const { handlers, auth } = NextAuth({
+export const { handlers } = NextAuth({
   adapter: DrizzleAdapter(db),
   providers: [
     GoogleProvider({
